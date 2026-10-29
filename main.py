@@ -33,8 +33,14 @@ def load_txt_lines(file_path):
                     lines.append(item)
     return lines
 
-def get_target_videos(target_url):
-    """使用 yt-dlp 取得 TikTok 用戶頁面或單支影片的資訊"""
+def get_target_videos(target):
+    """處理目標（帳號或網址），使用 yt-dlp 取得資訊"""
+    # 如果傳進來的不是網址（沒有 http 開頭），則自動當作 TikTok 帳號並組成完整網址
+    if not target.startswith("http"):
+        target_url = f"https://www.tiktok.com/@{target}"
+    else:
+        target_url = target
+
     ydl_opts = {
         'extract_flat': True,  # 僅提取清單資訊，不直接下載
         'quiet': True,
@@ -43,26 +49,22 @@ def get_target_videos(target_url):
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             result = ydl.extract_info(target_url, download=False)
-            if 'entries' in result:
+            if result and 'entries' in result:
                 for entry in result['entries']:
                     if entry:
-                        # 取得影片網址或 ID
-                        v_url = entry.get('url') or f"https://www.tiktok.com/@{entry.get('uploader')}/video/{entry.get('id')}"
-                        v_id = str(entry.get('id'))
+                        v_id = str(entry.get('id') or entry.get('url'))
+                        v_url = entry.get('url') or f"https://www.tiktok.com/@{target}/video/{v_id}"
                         video_items.append({'id': v_id, 'url': v_url})
-            elif 'id' in result:
+            elif result and 'id' in result:
                 v_id = str(result['id'])
                 video_items.append({'id': v_id, 'url': target_url})
     except Exception as e:
-        print(f"[-] 抓取目標 {target_url} 失敗: {e}")
+        print(f"[-] 抓取目標 {target} 失敗: {e}")
     return video_items
 
 def download_video(video_url):
-    """下載指定的 TikTok 影片"""
-    ydl_opts = {
-        # 'outtmpl': '%(title)s.%(ext)s', # 可自訂下載後的檔名格式
-    }
-    
+    """下載指定的影片"""
+    ydl_opts = {}
     print(f"[*] 開始下載影片: {video_url}")
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -77,7 +79,7 @@ def main():
     history_ids = load_history_ids()
     print(f"[*] 目前歷史記錄中有 {len(history_ids)} 筆已下載的影片。")
 
-    # 2. 讀取 accounts.txt 中的帳號清單與 all_videos.txt 中的指定影片
+    # 2. 讀取 accounts.txt 與 all_videos.txt
     accounts = load_txt_lines(ACCOUNTS_FILE)
     specific_videos = load_txt_lines(VIDEOS_FILE)
     
@@ -97,7 +99,6 @@ def main():
                 print(f"[+] 發現新影片！ID: {vid}")
                 success = download_video(v_url)
                 
-                # 如果下載成功，立即加入歷史記錄並寫入檔案
                 if success:
                     history_ids.add(vid)
                     save_history_id(vid)
