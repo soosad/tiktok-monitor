@@ -5,7 +5,7 @@ import random
 
 def check_tiktok_updates():
     channels_file = "channels.txt"
-    archive_file = "archive.txt"
+    output_report = "video_ids_report.txt"
     
     if not os.path.exists(channels_file):
         print(f"❌ 找不到 {channels_file} 檔案！")
@@ -23,30 +23,46 @@ def check_tiktok_updates():
             urls.append(f"https://www.tiktok.com/@{line}")
 
     total = len(urls)
-    print(f"📋 成功載入 {total} 位主播名單，開始逐一檢查...\n")
+    print(f"📋 成功載入 {total} 位主播名單，開始提取影片 ID...\n")
 
-    # 2. 設定 yt-dlp 參數
+    # 2. 設定 yt-dlp 參數（使用 extract_flat 輕量化抓取）
     ydl_opts = {
-        'download_archive': archive_file,  # 自動記錄與比對歷史紀錄
-        'playlist_end': 2,                 # 只檢查最新 2 支影片
-        'skip_download': True,             # 只檢查不下載影片，省時省流量
-        'quiet': True,                     # 隱藏過多冗長警告
+        'extract_flat': True,      # 僅抓取列表與基本 ID，不解析完整網頁，速度快且不易被擋
+        'playlist_end': 5,         # 每個主播抓取最新的 5 支影片 ID
+        'quiet': True,
         'no_warnings': True,
     }
 
-    # 3. 逐一迴圈檢查，加入緩衝時間避免被 TikTok 封鎖
+    all_results = []
+
+    # 3. 逐一檢查並收集 ID
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         for idx, url in enumerate(urls, 1):
             print(f"[{idx}/{total}] 正在檢查: {url}")
             try:
-                ydl.extract_info(url, download=False)
+                result = ydl.extract_info(url, download=False)
+                if result and 'entries' in result:
+                    print(f"  └─ 成功！找到影片清單")
+                    for entry in result['entries']:
+                        video_id = entry.get('id')
+                        video_title = entry.get('title', '無標題')
+                        if video_id:
+                            log_line = f"主播網址: {url} | 影片 ID: {video_id} | 標題: {video_title}"
+                            all_results.append(log_line)
+                            print(f"     • ID: {video_id}")
+                else:
+                    print(f"  └─ 該帳號無公開影片或無法解析")
             except Exception as e:
-                print(f"⚠️ 檢查 {url} 時發生錯誤，跳過繼續...")
+                print(f"  └─ ⚠️ 擷取失敗（被限制或帳號異常），跳過...")
             
-            # 💡 關鍵：每檢查完一個帳號，隨機暫停 2 到 4 秒，降低被風控的機率
-            time.sleep(random.uniform(2.0, 4.0))
+            # 隨機暫停 3 到 6 秒，保護連線
+            time.sleep(random.uniform(3.0, 6.0))
 
-    print("\n🎉 所有名單檢查完畢！")
+    # 4. 將統整結果寫入檔案，方便你之後下載檢視
+    with open(output_report, "w", encoding="utf-8") as f:
+        f.write("\n".join(all_results))
+
+    print(f"\n🎉 檢查完畢！共成功收集到 {len(all_results)} 筆影片 ID，已儲存至 {output_report}")
 
 if __name__ == "__main__":
     check_tiktok_updates()
