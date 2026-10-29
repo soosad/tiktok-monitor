@@ -1,5 +1,7 @@
 import yt_dlp
 import os
+import time
+import random
 
 def check_tiktok_updates():
     channels_file = "channels.txt"
@@ -32,7 +34,7 @@ def check_tiktok_updates():
         'no_warnings': True,
     }
 
-    # 3. 逐一迴圈檢查，並即時印出進度
+    # 3. 逐一迴圈檢查，加入緩衝時間避免被 TikTok 封鎖
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         for idx, url in enumerate(urls, 1):
             print(f"[{idx}/{total}] 正在檢查: {url}")
@@ -40,6 +42,9 @@ def check_tiktok_updates():
                 ydl.extract_info(url, download=False)
             except Exception as e:
                 print(f"⚠️ 檢查 {url} 時發生錯誤，跳過繼續...")
+            
+            # 💡 關鍵：每檢查完一個帳號，隨機暫停 2 到 4 秒，降低被風控的機率
+            time.sleep(random.uniform(2.0, 4.0))
 
     print("\n🎉 所有名單檢查完畢！")
 
