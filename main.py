@@ -34,16 +34,16 @@ def load_txt_lines(file_path):
     return lines
 
 def get_target_videos(target):
-    """處理目標（帳號或網址），使用 yt-dlp 取得資訊"""
-    # 如果傳進來的不是網址（沒有 http 開頭），則自動當作 TikTok 帳號並組成完整網址
+    """處理目標（帳號或網址），使用 yt-dlp 僅提取影片 ID 資訊"""
     if not target.startswith("http"):
         target_url = f"https://www.tiktok.com/@{target}"
     else:
         target_url = target
 
     ydl_opts = {
-        'extract_flat': True,  # 僅提取清單資訊，不直接下載
+        'extract_flat': 'in_playlist',  # 僅提取清單內的輕量資料
         'quiet': True,
+        'skip_download': True,
     }
     video_items = []
     try:
@@ -52,9 +52,10 @@ def get_target_videos(target):
             if result and 'entries' in result:
                 for entry in result['entries']:
                     if entry:
-                        v_id = str(entry.get('id') or entry.get('url'))
-                        v_url = entry.get('url') or f"https://www.tiktok.com/@{target}/video/{v_id}"
-                        video_items.append({'id': v_id, 'url': v_url})
+                        v_id = str(entry.get('id'))
+                        if v_id and v_id != 'None':
+                            v_url = entry.get('url') or f"https://www.tiktok.com/@{target}/video/{v_id}"
+                            video_items.append({'id': v_id, 'url': v_url})
             elif result and 'id' in result:
                 v_id = str(result['id'])
                 video_items.append({'id': v_id, 'url': target_url})
