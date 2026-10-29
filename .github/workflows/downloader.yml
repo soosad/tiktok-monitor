@@ -1,0 +1,46 @@
+name: Auto Stream Downloader
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # 每 6 小時執行一次，你可以根據需求修改 cron 表達式
+  workflow_dispatch:        # 允許你在 GitHub 網頁上按鈕手動觸發
+
+jobs:
+  run-downloader:
+    runs-on: ubuntu-latest
+    
+    # 賦予 GitHub Actions 寫入倉庫的權限（用來更新 history_ids.txt）
+    permissions:
+      contents: write
+
+    steps:
+    - name: 檢出程式碼 (Checkout repository)
+      uses: actions/checkout@v4
+
+    - name: 設定 Python 環境
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: 安裝相依套件
+      run: |
+        python -m pip install --upgrade pip
+        # 如果你有用到 yt-dlp 或 requests，請在這裡安裝
+        pip install yt-dlp requests 
+
+    - name: 執行 Python 程式
+      run: |
+        python main.py
+
+    - name: 自動提交並推送更新的歷史記錄
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # 檢查是否有檔案變動
+        git status
+        
+        # 將更新後的 history_ids.txt 加入追蹤並提交
+        git add history_ids.txt
+        git diff --quiet && git diff --cached --quiet || git commit -m "chore: update history ids [skip ci]"
+        git push
